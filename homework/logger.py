@@ -31,10 +31,14 @@ def test_logging(logger: tb.SummaryWriter):
 
             # TODO: log train_loss
             # TODO: save additional metrics to be averaged
-
+            logger.add_scalar("train_loss", dummy_train_loss, global_step)
+            metrics["train_acc"].append(dummy_train_accuracy.mean().item())
+            
             global_step += 1
 
         # TODO: log average train_accuracy
+        avg_train_accuracy = sum(metrics["train_acc"]) / len(metrics["train_acc"])
+        logger.add_scalar("train_accuracy", avg_train_accuracy, global_step)
 
         # example validation loop
         torch.manual_seed(epoch)
@@ -42,9 +46,11 @@ def test_logging(logger: tb.SummaryWriter):
             dummy_validation_accuracy = epoch / 10.0 + torch.randn(10)
 
             # TODO: save additional metrics to be averaged
+            metrics["val_acc"].append(dummy_validation_accuracy.mean().item())
 
         # TODO: log average val_accuracy
-
+        avg_val_accuracy = sum(metrics["val_acc"]) / len(metrics["val_acc"])
+        logger.add_scalar("val_accuracy", avg_val_accuracy, global_step)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
