@@ -75,7 +75,7 @@ class MLPClassifier(nn.Module):
         h: int = 64,
         w: int = 64,
         num_classes: int = 6,
-        hidden_dim: int = 256, # Added a hidden_dim argument for flexibility
+        hidden_dim: int = 128, # Added a hidden_dim argument for flexibility
 
     ):
         """
@@ -116,7 +116,7 @@ class MLPClassifierDeep(nn.Module):
         h: int = 64,
         w: int = 64,
         num_classes: int = 6,
-        hidden_dim: int = 256,
+        hidden_dim: int = 64,
         num_layers: int = 4, # At least 4 layers as per instructions
     ):
         """
@@ -134,19 +134,16 @@ class MLPClassifierDeep(nn.Module):
         super().__init__()
 
         input_dim = 3 * h * w
-        layers = []
-
-        # Input layer
-        layers.append(nn.Linear(input_dim, hidden_dim))
-        layers.append(nn.ReLU())
+        layers = [nn.Linear(input_dim, hidden_dim), nn.ReLU()]
 
         # Hidden layers
-        for _ in range(num_layers - 1): # num_layers includes the output layer
+        for _ in range(num_layers - 2): # num_layers includes the output layer
             layers.append(nn.Linear(hidden_dim, hidden_dim))
             layers.append(nn.ReLU())
         
         # Output layer
         layers.append(nn.Linear(hidden_dim, num_classes))
+        self.model = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -167,7 +164,7 @@ class MLPClassifierDeepResidual(nn.Module):
         h: int = 64,
         w: int = 64,
         num_classes: int = 6,
-        hidden_dim: int = 256,
+        hidden_dim: int = 64,
         num_layers: int = 4, 
     ):
         """
