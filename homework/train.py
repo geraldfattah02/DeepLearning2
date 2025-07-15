@@ -45,7 +45,7 @@ def train(
 
     # create loss function and optimizer
     loss_func = ClassificationLoss()
-    # optimizer = ...
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     global_step = 0
     metrics = {"train_acc": [], "val_acc": []}
@@ -62,8 +62,33 @@ def train(
             img, label = img.to(device), label.to(device)
 
             # TODO: implement training step
-            raise NotImplementedError("Training step not implemented")
+            
+            # Zero the gradients from the previous step
+            optimizer.zero_grad()
 
+            # Forward pass: compute predicted logits
+            logits = model(img)
+
+            # Compute the loss
+            loss = loss_func(logits, label)
+
+            # Backward pass: compute gradient of the loss with respect to model parameters
+            loss.backward()
+
+            # Optimizer step: update model parameters
+            optimizer.step()
+
+            # Log training loss per iteration to TensorBoard
+            logger.add_scalar("train_loss", loss.item(), global_step)
+            
+            # Calculate training accuracy for the current batch
+            # Get the index of the max log-probability as the predicted class
+            pred = logits.argmax(dim=1)
+            # Count correct predictions
+            correct = (pred == label).sum().item()
+            # Calculate batch accuracy and append to metrics
+            batch_accuracy = correct / label.size(0)
+            metrics["train_acc"].append(batch_accuracy)
             global_step += 1
 
         # disable gradient computation and switch to evaluation mode
@@ -74,13 +99,27 @@ def train(
                 img, label = img.to(device), label.to(device)
 
                 # TODO: compute validation accuracy
-                raise NotImplementedError("Validation accuracy not implemented")
+                # Forward pass
+                logits = model(img)
+
+                # Calculate validation accuracy for the current batch
+                pred = logits.argmax(dim=1)
+                correct = (pred == label).sum().item()
+                batch_accuracy = correct / label.size(0)
+                metrics["val_acc"].append(batch_accuracy)
 
         # log average train and val accuracy to tensorboard
         epoch_train_acc = torch.as_tensor(metrics["train_acc"]).mean()
         epoch_val_acc = torch.as_tensor(metrics["val_acc"]).mean()
 
-        raise NotImplementedError("Logging not implemented")
+        # Calculate average train and val accuracy for the epoch
+        epoch_train_acc = torch.as_tensor(metrics["train_acc"]).mean()
+        epoch_val_acc = torch.as_tensor(metrics["val_acc"]).mean()
+
+        # Log average train and val accuracy to TensorBoard at the end of the epoch
+        # Use global_step to align epoch-level metrics with the last training iteration of the epoch
+        logger.add_scalar("train_accuracy", epoch_train_acc, global_step)
+        logger.add_scalar("val_accuracy", epoch_val_acc, global_step)
 
         # print on first, last, every 10th epoch
         if epoch == 0 or epoch == num_epoch - 1 or (epoch + 1) % 10 == 0:

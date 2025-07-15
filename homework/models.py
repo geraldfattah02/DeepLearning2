@@ -10,6 +10,8 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 
 
 class ClassificationLoss(nn.Module):
@@ -25,7 +27,7 @@ class ClassificationLoss(nn.Module):
         Returns:
             tensor, scalar loss
         """
-        raise NotImplementedError("ClassificationLoss.forward() is not implemented")
+        return F.cross_entropy(logits, target)
 
 
 class LinearClassifier(nn.Module):
@@ -43,7 +45,12 @@ class LinearClassifier(nn.Module):
         """
         super().__init__()
 
-        raise NotImplementedError("LinearClassifier.__init__() is not implemented")
+        # Input image is 3 channels (RGB), HxW.
+        # For a linear classifier, we need to flatten the input image into a 1D vector.
+        # The size of this vector will be 3 * H * W.
+        input_dim = 3 * h * w
+        # The linear layer maps the flattened input to the number of classes.
+        self.linear = nn.Linear(input_dim, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -53,7 +60,13 @@ class LinearClassifier(nn.Module):
         Returns:
             tensor (b, num_classes) logits
         """
-        raise NotImplementedError("LinearClassifier.forward() is not implemented")
+        # Flatten the input tensor from (B, 3, H, W) to (B, 3*H*W)
+        # The -1 in view means that dimension will be inferred.
+        # So, x.view(x.size(0), -1) flattens all dimensions after the batch dimension.
+        x = x.view(x.size(0), -1)
+        # Pass the flattened tensor through the linear layer to get the logits.
+        logits = self.linear(x)
+        return logits
 
 
 class MLPClassifier(nn.Module):
@@ -62,6 +75,8 @@ class MLPClassifier(nn.Module):
         h: int = 64,
         w: int = 64,
         num_classes: int = 6,
+        hidden_dim: int = 256, # Added a hidden_dim argument for flexibility
+
     ):
         """
         An MLP with a single hidden layer
@@ -72,8 +87,13 @@ class MLPClassifier(nn.Module):
             num_classes: int, number of classes
         """
         super().__init__()
-
-        raise NotImplementedError("MLPClassifier.__init__() is not implemented")
+    
+        input_dim = 3 * h * w
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim), # Input layer to hidden layer
+            nn.ReLU(),                        # Activation function
+            nn.Linear(hidden_dim, num_classes) # Hidden layer to output layer
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -83,7 +103,11 @@ class MLPClassifier(nn.Module):
         Returns:
             tensor (b, num_classes) logits
         """
-        raise NotImplementedError("MLPClassifier.forward() is not implemented")
+        # Flatten the input tensor
+        x = x.view(x.size(0), -1)
+        # Pass through the sequential model
+        logits = self.model(x)
+        return logits
 
 
 class MLPClassifierDeep(nn.Module):
@@ -92,6 +116,8 @@ class MLPClassifierDeep(nn.Module):
         h: int = 64,
         w: int = 64,
         num_classes: int = 6,
+        hidden_dim: int = 256,
+        num_layers: int = 4, # At least 4 layers as per instructions
     ):
         """
         An MLP with multiple hidden layers
@@ -107,7 +133,20 @@ class MLPClassifierDeep(nn.Module):
         """
         super().__init__()
 
-        raise NotImplementedError("MLPClassifierDeep.__init__() is not implemented")
+        input_dim = 3 * h * w
+        layers = []
+
+        # Input layer
+        layers.append(nn.Linear(input_dim, hidden_dim))
+        layers.append(nn.ReLU())
+
+        # Hidden layers
+        for _ in range(num_layers - 1): # num_layers includes the output layer
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
+        
+        # Output layer
+        layers.append(nn.Linear(hidden_dim, num_classes))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -117,8 +156,10 @@ class MLPClassifierDeep(nn.Module):
         Returns:
             tensor (b, num_classes) logits
         """
-        raise NotImplementedError("MLPClassifierDeep.forward() is not implemented")
 
+        x = x.view(x.size(0), -1)
+        logits = self.model(x)
+        return logits
 
 class MLPClassifierDeepResidual(nn.Module):
     def __init__(
@@ -126,6 +167,8 @@ class MLPClassifierDeepResidual(nn.Module):
         h: int = 64,
         w: int = 64,
         num_classes: int = 6,
+        hidden_dim: int = 256,
+        num_layers: int = 4, 
     ):
         """
         Args:
@@ -139,7 +182,27 @@ class MLPClassifierDeepResidual(nn.Module):
         """
         super().__init__()
 
-        raise NotImplementedError("MLPClassifierDeepResidual.__init__() is not implemented")
+        input_dim = 3 * h * w
+        
+        # Initial linear layer to project input to hidden_dim
+        self.initial_layer = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU()
+        )
+
+        # Create a ModuleList for residual blocks
+        self.residual_blocks = nn.ModuleList()
+        for _ in range(num_layers - 1): # num_layers includes the initial and final layers
+            # Each residual block consists of two linear layers with ReLU in between
+            block = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim)
+            )
+            self.residual_blocks.append(block)
+        
+        # Final linear layer to project to num_classes
+        self.output_layer = nn.Linear(hidden_dim, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -149,7 +212,20 @@ class MLPClassifierDeepResidual(nn.Module):
         Returns:
             tensor (b, num_classes) logits
         """
-        raise NotImplementedError("MLPClassifierDeepResidual.forward() is not implemented")
+        x = x.view(x.size(0), -1) # Flatten the input
+
+        # Pass through the initial layer
+        x = self.initial_layer(x)
+
+        # Pass through residual blocks
+        for block in self.residual_blocks:
+            # Add the input to the block's output (residual connection)
+            # Apply ReLU after the addition as is common in ResNets
+            x = F.relu(x + block(x))
+        
+        # Pass through the final output layer
+        logits = self.output_layer(x)
+        return logits
 
 
 model_factory = {
