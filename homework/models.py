@@ -27,7 +27,35 @@ class Classifier(nn.Module):
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
         # TODO: implement
-        pass
+        # Simple ConvNet: Conv -> BN -> ReLU -> Pool -> (repeat) -> FC
+        self.features = nn.Sequential(
+            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 32x32x32
+
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 64x16x16
+
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 128x8x8
+
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 256x4x4
+        )
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(256 * 4 * 4, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),
+            nn.Linear(256, num_classes),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -41,7 +69,8 @@ class Classifier(nn.Module):
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
         # TODO: replace with actual forward pass
-        logits = torch.randn(x.size(0), 6)
+        feats = self.features(z)
+        logits = self.classifier(feats)
 
         return logits
 
@@ -79,7 +108,50 @@ class Detector(torch.nn.Module):
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
         # TODO: implement
-        pass
+        # Shared encoder
+        self.encoder = nn.Sequential(
+            nn.Conv2d(in_channels, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 32x32x32
+
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 64x16x16
+
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 128x8x8
+
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 256x4x4
+        )
+
+        # Segmentation head (upsample back to input size)
+        self.seg_head = nn.Sequential(
+            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),  # 128x8x8
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),   # 64x16x16
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),    # 32x32x32
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(32, num_classes, kernel_size=2, stride=2),  # num_classesx64x64
+        )
+
+        # Depth head (upsample back to input size)
+        self.depth_head = nn.Sequential(
+            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(32, 1, kernel_size=2, stride=2),  # 1x64x64
+        )
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -98,8 +170,9 @@ class Detector(torch.nn.Module):
         z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
         # TODO: replace with actual forward pass
-        logits = torch.randn(x.size(0), 3, x.size(2), x.size(3))
-        raw_depth = torch.rand(x.size(0), x.size(2), x.size(3))
+        feats = self.encoder(z)
+        logits = self.seg_head(feats)
+        raw_depth = self.depth_head(feats).squeeze(1)  # (b, h, w)
 
         return logits, raw_depth
 
