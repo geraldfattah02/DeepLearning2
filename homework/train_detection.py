@@ -66,7 +66,7 @@ def train(
             optimizer.zero_grad()
 
             # Forward pass: compute predicted logits
-            logits = model(img)
+            logits, raw_depth = model(img)
 
             # Compute the loss
             loss = loss_func(logits, label)
