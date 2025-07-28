@@ -43,7 +43,7 @@ def train(
     val_data = load_data("classification_data/val", shuffle=False)
 
     # create loss function and optimizer
-    loss_func = Classifier()
+    loss_func = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     global_step = 0
