@@ -11,7 +11,7 @@ from .datasets.classification_dataset import load_data
 
 def train(
     exp_dir: str = "logs",
-    model_name: str = "linear",
+    model_name: str = "classifier",
     num_epoch: int = 50,
     lr: float = 1e-3,
     batch_size: int = 128,
