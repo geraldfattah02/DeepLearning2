@@ -56,49 +56,45 @@ def train(
             metrics[key].clear()
 
         model.train()
+        for batch in train_data:
+            img = batch["image"].to(device)
+            label = batch["track"].long().to(device)
 
-        for dataset_group in train_data:
-          for data_loader in dataset_group:
-            for batch in data_loader:
-              img = batch["image"].to(device)
-              label = batch["track"].long().to(device)
+            # TODO: implement training step
+            
+            # Zero the gradients from the previous step
+            optimizer.zero_grad()
 
-              # TODO: implement training step
-              
-              # Zero the gradients from the previous step
-              optimizer.zero_grad()
+            # Forward pass: compute predicted logits
+            logits, raw_depth = model(img)
 
-              # Forward pass: compute predicted logits
-              logits, raw_depth = model(img)
+            # Compute the loss
+            loss = loss_func(logits, label)
 
-              # Compute the loss
-              loss = loss_func(logits, label)
+            # Backward pass: compute gradient of the loss with respect to model parameters
+            loss.backward()
 
-              # Backward pass: compute gradient of the loss with respect to model parameters
-              loss.backward()
+            # Optimizer step: update model parameters
+            optimizer.step()
 
-              # Optimizer step: update model parameters
-              optimizer.step()
-
-              # Log training loss per iteration to TensorBoard
-              logger.add_scalar("train_loss", loss.item(), global_step)
-              
-              # Calculate training accuracy for the current batch
-              # Get the index of the max log-probability as the predicted class
-              pred = logits.argmax(dim=1)
-              # Count correct predictions
-              correct = (pred == label).sum().item()
-              # Calculate batch accuracy and append to metrics
-              total = label.numel()  # total number of elements in label
-              batch_accuracy = correct / total
-              metrics["train_acc"].append(batch_accuracy)
-              global_step += 1
+            # Log training loss per iteration to TensorBoard
+            logger.add_scalar("train_loss", loss.item(), global_step)
+            
+            # Calculate training accuracy for the current batch
+            # Get the index of the max log-probability as the predicted class
+            pred = logits.argmax(dim=1)
+            # Count correct predictions
+            correct = (pred == label).sum().item()
+            # Calculate batch accuracy and append to metrics
+            total = label.numel()  # total number of elements in label
+            batch_accuracy = correct / total
+            metrics["train_acc"].append(batch_accuracy)
+            global_step += 1
 
         # disable gradient computation and switch to evaluation mode
         with torch.inference_mode():
             model.eval()
-            for data_loader in val_data:
-              for batch in data_loader:
+            for batch in val_data:
                 img = batch["image"].to(device)
                 label = batch["track"].long().to(device)
 
