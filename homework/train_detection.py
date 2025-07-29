@@ -59,6 +59,7 @@ def train(
         for batch in train_data:
             img = batch["image"].to(device)
             label = batch["track"].long().to(device)
+            target_depth = batch["depth"].to(device)
 
             # TODO: implement training step
             
@@ -69,7 +70,9 @@ def train(
             logits, raw_depth = model(img)
 
             # Compute the loss
-            loss = loss_func(logits, label)
+            seg_loss = loss_func(logits, label)
+            depth_loss = torch.nn.functional.l1_loss(raw_depth, target_depth)
+            loss = seg_loss + 0.5 * depth_loss  # or tune the weight
 
             # Backward pass: compute gradient of the loss with respect to model parameters
             loss.backward()
@@ -107,14 +110,7 @@ def train(
                 total = label.numel()  # total number of elements in label
                 batch_accuracy = correct / total
                 metrics["val_acc"].append(batch_accuracy)
-
-        # log average train and val accuracy to tensorboard
-        #print(metrics["train_acc"])
-        #print(metrics["val_acc"])
-
-        epoch_train_acc = torch.as_tensor(metrics["train_acc"]).mean()
-        epoch_val_acc = torch.as_tensor(metrics["val_acc"]).mean()
-
+                
         # Calculate average train and val accuracy for the epoch
         epoch_train_acc = torch.as_tensor(metrics["train_acc"]).mean()
         epoch_val_acc = torch.as_tensor(metrics["val_acc"]).mean()
