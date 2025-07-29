@@ -44,7 +44,7 @@ def train(
                   [load_data(f"drive_data/train/lighthouse_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)],
                   [load_data(f"drive_data/train/snowmountain_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)]]
                   
-    val_data = [load_data("drive_data/val/cornfield_crossing_05", shuffle=False),load_data("drive_data/val/hacienda_05"),
+    val_data = [load_data("drive_data/val/cornfield_crossing_05", shuffle=False),load_data("drive_data/val/hacienda_05", shuffle=False),
                 load_data("drive_data/val/lighthouse_05", shuffle=False),load_data("drive_data/val/snowmountain_05", shuffle=False)]
 
     # create loss function and optimizer
@@ -64,8 +64,9 @@ def train(
 
         for dataset_group in train_data:
           for data_loader in dataset_group:
-            for img, label in data_loader:
-              img, label = img.to(device), label.to(device)
+            for batch in data_loader:
+              img = batch["image"].to(device)
+              label = batch["track"].long().to(device)
 
               # TODO: implement training step
               
@@ -93,7 +94,8 @@ def train(
               # Count correct predictions
               correct = (pred == label).sum().item()
               # Calculate batch accuracy and append to metrics
-              batch_accuracy = correct / label.size(0)
+              total = label.numel()  # total number of elements in label
+              batch_accuracy = correct / total
               metrics["train_acc"].append(batch_accuracy)
               global_step += 1
 
@@ -101,20 +103,24 @@ def train(
         with torch.inference_mode():
             model.eval()
             for data_loader in val_data:
-              for img, label in data_loader:
-                img, label = img.to(device), label.to(device)
+              for batch in data_loader:
+                img = batch["image"].to(device)
+                label = batch["track"].long().to(device)
 
-                # compute validation accuracy
                 # Forward pass
-                logits = model(img)
+                logits, _ = model(img)  # Only need segmentation logits here
 
-                # Calculate validation accuracy for the current batch
+                # Compute validation accuracy
                 pred = logits.argmax(dim=1)
                 correct = (pred == label).sum().item()
-                batch_accuracy = correct / label.size(0)
+                total = label.numel()  # total number of elements in label
+                batch_accuracy = correct / total
                 metrics["val_acc"].append(batch_accuracy)
 
         # log average train and val accuracy to tensorboard
+        #print(metrics["train_acc"])
+        #print(metrics["val_acc"])
+
         epoch_train_acc = torch.as_tensor(metrics["train_acc"]).mean()
         epoch_val_acc = torch.as_tensor(metrics["val_acc"]).mean()
 

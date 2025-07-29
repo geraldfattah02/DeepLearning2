@@ -131,26 +131,27 @@ class Detector(torch.nn.Module):
             nn.MaxPool2d(2),  # 256x4x4
         )
 
-        # Segmentation head (upsample back to input size)
+        # Segmentation head (upsample to 96x128)
         self.seg_head = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),  # 128x8x8
+            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),  # -> 12x16
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),   # 64x16x16
+            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),   # -> 24x32
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),    # 32x32x32
+            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),    # -> 48x64
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(32, num_classes, kernel_size=2, stride=2),  # num_classesx64x64
+            nn.ConvTranspose2d(32, num_classes, kernel_size=4, stride=2, padding=1),  # -> 96x128
         )
 
-        # Depth head (upsample back to input size)
+        # Depth head (same as above, 1 channel)
         self.depth_head = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
+            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
+            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),
+            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(32, 1, kernel_size=2, stride=2),  # 1x64x64
+            nn.ConvTranspose2d(32, 1, kernel_size=4, stride=2, padding=1),
+            nn.Sigmoid()
         )
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
