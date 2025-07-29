@@ -39,13 +39,8 @@ def train(
     model = model.to(device)
     model.train()
 
-    train_data = [[load_data(f"drive_data/train/cornfield_crossing_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)],
-                  [load_data(f"drive_data/train/hacienda_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)],
-                  [load_data(f"drive_data/train/lighthouse_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)],
-                  [load_data(f"drive_data/train/snowmountain_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)]]
-                  
-    val_data = [load_data("drive_data/val/cornfield_crossing_05", shuffle=False),load_data("drive_data/val/hacienda_05", shuffle=False),
-                load_data("drive_data/val/lighthouse_05", shuffle=False),load_data("drive_data/val/snowmountain_05", shuffle=False)]
+    train_data = load_data("drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
+    val_data = load_data("drive_data/val", shuffle=False)
 
     # create loss function and optimizer
     loss_func = torch.nn.CrossEntropyLoss()
