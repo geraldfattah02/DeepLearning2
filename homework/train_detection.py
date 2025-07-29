@@ -39,8 +39,13 @@ def train(
     model = model.to(device)
     model.train()
 
-    train_data = load_data("drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
-    val_data = load_data("drive_data/val", shuffle=False)
+    train_data = [[load_data(f"drive_data/train/cornfield_crossing_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)],
+                  [load_data(f"drive_data/train/hacienda_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)],
+                  [load_data(f"drive_data/train/lighthouse_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)],
+                  [load_data(f"drive_data/train/snowmountain_0{i}", shuffle=True, batch_size=batch_size, num_workers=2) for i in range(4)]]
+                  
+    val_data = [load_data("drive_data/val/cornfield_crossing_05", shuffle=False),load_data("drive_data/val/hacienda_05"),
+                load_data("drive_data/val/lighthouse_05", shuffle=False),load_data("drive_data/val/snowmountain_05", shuffle=False)]
 
     # create loss function and optimizer
     loss_func = torch.nn.CrossEntropyLoss()
@@ -57,44 +62,46 @@ def train(
 
         model.train()
 
-        for img, label in train_data:
-            img, label = img.to(device), label.to(device)
+        for dataset_group in train_data:
+          for data_loader in dataset_group:
+            for img, label in data_loader:
+              img, label = img.to(device), label.to(device)
 
-            # TODO: implement training step
-            
-            # Zero the gradients from the previous step
-            optimizer.zero_grad()
+              # TODO: implement training step
+              
+              # Zero the gradients from the previous step
+              optimizer.zero_grad()
 
-            # Forward pass: compute predicted logits
-            logits, raw_depth = model(img)
+              # Forward pass: compute predicted logits
+              logits, raw_depth = model(img)
 
-            # Compute the loss
-            loss = loss_func(logits, label)
+              # Compute the loss
+              loss = loss_func(logits, label)
 
-            # Backward pass: compute gradient of the loss with respect to model parameters
-            loss.backward()
+              # Backward pass: compute gradient of the loss with respect to model parameters
+              loss.backward()
 
-            # Optimizer step: update model parameters
-            optimizer.step()
+              # Optimizer step: update model parameters
+              optimizer.step()
 
-            # Log training loss per iteration to TensorBoard
-            logger.add_scalar("train_loss", loss.item(), global_step)
-            
-            # Calculate training accuracy for the current batch
-            # Get the index of the max log-probability as the predicted class
-            pred = logits.argmax(dim=1)
-            # Count correct predictions
-            correct = (pred == label).sum().item()
-            # Calculate batch accuracy and append to metrics
-            batch_accuracy = correct / label.size(0)
-            metrics["train_acc"].append(batch_accuracy)
-            global_step += 1
+              # Log training loss per iteration to TensorBoard
+              logger.add_scalar("train_loss", loss.item(), global_step)
+              
+              # Calculate training accuracy for the current batch
+              # Get the index of the max log-probability as the predicted class
+              pred = logits.argmax(dim=1)
+              # Count correct predictions
+              correct = (pred == label).sum().item()
+              # Calculate batch accuracy and append to metrics
+              batch_accuracy = correct / label.size(0)
+              metrics["train_acc"].append(batch_accuracy)
+              global_step += 1
 
         # disable gradient computation and switch to evaluation mode
         with torch.inference_mode():
             model.eval()
-
-            for img, label in val_data:
+            for data_loader in val_data:
+              for img, label in data_loader:
                 img, label = img.to(device), label.to(device)
 
                 # compute validation accuracy
