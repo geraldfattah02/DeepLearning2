@@ -183,11 +183,29 @@ class CNNPlanner(torch.nn.Module):
             image (torch.FloatTensor): shape (b, 3, h, w) and vals in [0, 1]
 
         Returns:
-            torch.FloatTensor: future waypoints with shape (b, n, 2)
+            torch.FloatTensor: future waypoints with shape (b, n_waypoints, 2)
         """
         x = image
-        x = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
+        
+        # Skip normalization as requested
+        # x = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
+        # Forward through CNN backbone
+        x = self.backbone(x)
+        
+        # Global average pooling to get (B, 512, 1, 1)
+        x = self.pool(x)
+        
+        # Flatten to (B, 512)
+        x = x.view(x.size(0), -1)
+        
+        # Forward through fully connected layers
+        x = self.fc(x)
+        
+        # Reshape from (B, n_waypoints * 2) to (B, n_waypoints, 2)
+        x = x.view(-1, self.n_waypoints, 2)
+        
+        return x
         
 
 
