@@ -47,7 +47,7 @@ def train(
     # note: the grader uses default kwargs, you'll have to bake them in for the final submission
     model = load_model(model_name, **kwargs)
     model = model.to(device)
-    model.train()
+    #model.train()
 
     train_data = load_data("drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
     val_data = load_data("drive_data/val", shuffle=False)
@@ -126,15 +126,14 @@ def train(
 
         # Log average train and val accuracy to TensorBoard at the end of the epoch
         # Use global_step to align epoch-level metrics with the last training iteration of the epoch
-        logger.add_scalar("train_accuracy", epoch_train_acc, global_step)
-        logger.add_scalar("val_accuracy", epoch_val_acc, global_step)
+
 
         # print on first, last, every 10th epoch
         if epoch == 0 or epoch == num_epoch - 1 or (epoch + 1) % 10 == 0:
             print(
-                f"Epoch {epoch + 1:2d} / {num_epoch:2d}: "
-                f"train_acc={epoch_train_acc:.4f} "
-                f"val_acc={epoch_val_acc:.4f}"
+                f"Epoch {epoch+1:02d}/{num_epoch:02d} "
+                f"Train Lon: {epoch_train_lon:.3f} Lat: {epoch_train_lat:.3f} | "
+                f"Val Lon: {epoch_val_lon:.3f} Lat: {epoch_val_lat:.3f}"
             )
 
     # save and overwrite the model in the root directory for grading
