@@ -13,6 +13,7 @@ class MLPPlanner(nn.Module):
         self,
         n_track: int = 10,
         n_waypoints: int = 3,
+        hidden_dim: int = 128,
     ):
         """
         Args:
@@ -23,6 +24,18 @@ class MLPPlanner(nn.Module):
 
         self.n_track = n_track
         self.n_waypoints = n_waypoints
+
+        # input dim: left track (n_track, 2) + right track (n_track, 2)
+        input_dim = 2 * n_track * 2
+        output_dim = n_waypoints * 2
+
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, output_dim),
+        )
 
     def forward(
         self,
@@ -48,7 +61,7 @@ class MLPPlanner(nn.Module):
         x = torch.cat([track_left.reshape(b, -1), track_right.reshape(b, -1)], dim=-1)
         out = self.net(x)
         out = out.view(b, self.n_waypoints, 2)
-        return out
+        return out.view(b, self.n_waypoints, 2)
 
 
 class TransformerPlanner(nn.Module):
@@ -163,7 +176,7 @@ class CNNPlanner(torch.nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(128, n_waypoints * 2),
         )
-        
+
     def forward(self, image: torch.Tensor, **kwargs) -> torch.Tensor:
         """
         Args:
