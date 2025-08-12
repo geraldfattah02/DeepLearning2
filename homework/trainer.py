@@ -5,6 +5,8 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.utils.tensorboard as tb
+import torch.nn.functional as F
+
 
 from .models import load_model, save_model
 from .datasets.road_dataset import load_data
@@ -53,7 +55,7 @@ def train(
     val_data = load_data("drive_data/val", shuffle=False)
 
     # create loss function and optimizer
-    loss_func = torch.nn.CrossEntropyLoss()
+    loss_func = F.l1_loss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     global_step = 0
