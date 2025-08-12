@@ -13,7 +13,7 @@ class MLPPlanner(nn.Module):
         self,
         n_track: int = 10,
         n_waypoints: int = 3,
-        hidden_dim: int = 128,
+        hidden_dim: int = 256,
     ):
         """
         Args:

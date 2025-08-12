@@ -76,8 +76,13 @@ def train(
             optimizer.zero_grad()
 
             # Forward pass: compute predicted logits
-            pred_wp = model(track_left, track_right)  # (B, n_waypoints, 2)
-
+            # Different models expect different inputs
+            if model_name == "cnn_planner":
+                image = batch["image"].to(device)  # (B, 3, H, W)
+                pred_wp = model(image=image)
+            else:  # mlp_planner or transformer_planner
+                pred_wp = model(track_left=track_left, track_right=track_right)
+                
             # Compute the loss
             loss_all = F.l1_loss(pred_wp, waypoints, reduction='none').mean(dim=-1)  # (B, n_waypoints)
             loss = (loss_all * mask).sum() / mask.sum()
