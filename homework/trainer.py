@@ -49,13 +49,12 @@ def train(
     # note: the grader uses default kwargs, you'll have to bake them in for the final submission
     model = load_model(model_name, **kwargs)
     model = model.to(device)
-    #model.train()
+    model.train()
 
     train_data = load_data("drive_data/train", shuffle=True, batch_size=batch_size, num_workers=2)
     val_data = load_data("drive_data/val", shuffle=False)
 
-    # create loss function and optimizer
-    loss_func = F.l1_loss()
+    # create optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     global_step = 0
@@ -80,7 +79,7 @@ def train(
             pred_wp = model(track_left, track_right)  # (B, n_waypoints, 2)
 
             # Compute the loss
-            loss_all = loss_func(pred_wp, waypoints).mean(dim=-1)  # (B, n_waypoints)
+            loss_all = F.l1_loss(pred_wp, waypoints, reduction='none').mean(dim=-1)  # (B, n_waypoints)
             loss = (loss_all * mask).sum() / mask.sum()
 
             # Backward pass: compute gradient of the loss with respect to model parameters
