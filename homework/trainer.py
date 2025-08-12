@@ -82,7 +82,7 @@ def train(
                 pred_wp = model(image=image)
             else:  # mlp_planner or transformer_planner
                 pred_wp = model(track_left=track_left, track_right=track_right)
-                
+
             # Compute the loss
             loss_all = F.l1_loss(pred_wp, waypoints, reduction='none').mean(dim=-1)  # (B, n_waypoints)
             loss = (loss_all * mask).sum() / mask.sum()
@@ -112,8 +112,12 @@ def train(
                 waypoints = batch["waypoints"].to(device)
                 mask = batch["waypoints_mask"].to(device)
 
-                # Forward pass
-                pred_wp = model(track_left, track_right)
+                # Forward pass - handle different model types
+                if model_name == "cnn_planner":
+                    image = batch["image"].to(device)
+                    pred_wp = model(image=image)
+                else:  # mlp_planner or transformer_planner
+                    pred_wp = model(track_left=track_left, track_right=track_right)
 
                 lon_err, lat_err = compute_errors(pred_wp, waypoints, mask)
                 val_lon_errs.append(lon_err)
