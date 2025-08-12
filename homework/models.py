@@ -43,7 +43,12 @@ class MLPPlanner(nn.Module):
         Returns:
             torch.Tensor: future waypoints with shape (b, n_waypoints, 2)
         """
-        raise NotImplementedError
+        b = track_left.shape[0]
+        # Flatten and concatenate
+        x = torch.cat([track_left.reshape(b, -1), track_right.reshape(b, -1)], dim=-1)
+        out = self.net(x)
+        out = out.view(b, self.n_waypoints, 2)
+        return out
 
 
 class TransformerPlanner(nn.Module):
@@ -52,6 +57,9 @@ class TransformerPlanner(nn.Module):
         n_track: int = 10,
         n_waypoints: int = 3,
         d_model: int = 64,
+        nhead: int = 8,
+        num_layers: int = 2,
+        dim_feedforward: int = 128,
     ):
         super().__init__()
 
@@ -59,6 +67,20 @@ class TransformerPlanner(nn.Module):
         self.n_waypoints = n_waypoints
 
         self.query_embed = nn.Embedding(n_waypoints, d_model)
+
+        # Project 2D track points into d_model
+        self.input_proj = nn.Linear(2, d_model)
+
+        # positional embedding for track sequence (optional, but helpful)
+        self.pos_embed = nn.Parameter(torch.randn(2 * n_track, d_model))
+
+        decoder_layer = nn.TransformerDecoderLayer(
+            d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward
+        )
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_layers)
+
+        # output projection from decoder embeddings to 2D waypoints
+        self.out_proj = nn.Linear(d_model, 2)
 
     def forward(
         self,
@@ -79,7 +101,35 @@ class TransformerPlanner(nn.Module):
         Returns:
             torch.Tensor: future waypoints with shape (b, n_waypoints, 2)
         """
-        raise NotImplementedError
+        b = track_left.shape[0]
+        device = track_left.device
+
+        # concatenate left/right into a sequence (b, seq_len, 2)
+        seq = torch.cat([track_left, track_right], dim=1)
+        seq_len = seq.shape[1]  # should be 2 * n_track
+
+        # project to d_model
+        memory = self.input_proj(seq)  # (b, seq_len, d_model)
+        # add positional embedding
+        pos = self.pos_embed[:seq_len].unsqueeze(0).to(device)  # (1, seq_len, d_model)
+        memory = memory + pos
+
+        # transformer expects (S, B, E)
+        memory = memory.permute(1, 0, 2).contiguous()
+
+        # prepare target queries: (T, B, E)
+        query_ids = torch.arange(self.n_waypoints, device=device)
+        tgt = self.query_embed(query_ids)  # (T, E)
+        tgt = tgt.unsqueeze(1).repeat(1, b, 1)
+
+        # decode
+        out = self.decoder(tgt=tgt, memory=memory)  # (T, B, E)
+
+        # project to 2D
+        out = out.permute(1, 0, 2).contiguous()  # (B, T, E)
+        out = self.out_proj(out)  # (B, T, 2)
+
+        return out
 
 
 class CNNPlanner(torch.nn.Module):
@@ -94,6 +144,26 @@ class CNNPlanner(torch.nn.Module):
         self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN), persistent=False)
         self.register_buffer("input_std", torch.as_tensor(INPUT_STD), persistent=False)
 
+        # simple conv backbone to process 96x128 input
+        # output spatial dims after convs will be small; then global pool + fc
+        self.backbone = nn.Sequential(
+            nn.Conv2d(3, 16, kernel_size=5, stride=2, padding=2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+        )
+
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, n_waypoints * 2),
+        )
+        
     def forward(self, image: torch.Tensor, **kwargs) -> torch.Tensor:
         """
         Args:
@@ -105,7 +175,7 @@ class CNNPlanner(torch.nn.Module):
         x = image
         x = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
 
-        raise NotImplementedError
+        
 
 
 MODEL_FACTORY = {
